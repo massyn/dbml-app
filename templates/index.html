@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero">
+  <div class="eyebrow">{{ 'Project' if project else 'Overview' }}</div>
+  <h1>{{ project.name|label if project else 'DBML CRUD' }}</h1>
+  {% if project and project.note %}<div class="hero-note md">{{ project.note|markdown }}</div>{% endif %}
+  <div class="hero-stats">
+    <div><span class="num">{{ all_tables|length }}</span><span class="lbl">tables</span></div>
+    <div><span class="num">{{ counts.values()|sum }}</span><span class="lbl">records</span></div>
+  </div>
+</section>
+
+{% for group in groups %}
+<section class="table-group">
+  <div class="section-label">{{ group.name }}</div>
+  {% if group.note %}<div class="group-note md">{{ group.note|markdown }}</div>{% endif %}
+  <div class="row g-3">
+    {% for name in group.tables %}
+    {% set t = all_tables[name] %}
+    {% set n = counts[name] %}
+    <div class="col-md-6 col-xl-4">
+      <div class="table-card position-relative"{% if t.header_color %} style="--table-accent: {{ t.header_color }}"{% endif %}>
+        <span class="table-card-icon"><i class="bi bi-table"></i></span>
+        <div class="table-card-body">
+          <h2><a class="stretched-link" href="{{ url_for('crud.list_records', name=t.name) }}">{{ t.name|label }}</a></h2>
+          {% if t.note %}<div class="md">{{ t.note|markdown }}</div>{% endif %}
+        </div>
+        <div class="table-card-count">
+          <span class="num">{{ n }}</span>
+          <span class="lbl">record{{ '' if n == 1 else 's' }}</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+
+{% if notes %}
+<section class="table-group">
+  <div class="section-label">Notes</div>
+  <div class="row g-3">
+    {% for note in notes %}
+    <div class="col-md-6 col-xl-4">
+      <div class="sticky-note">
+        <div class="sticky-note-name"><i class="bi bi-sticky"></i> {{ note.name }}</div>
+        <div class="md">{{ note.text|markdown }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

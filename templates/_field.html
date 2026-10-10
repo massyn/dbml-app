@@ -1,0 +1,59 @@
+{# One form control, chosen from the column's DBML definition. #}
+{% macro field(c, values, labels, errors) %}
+{% set v = values.get(c.name) %}
+{% set v = '' if v is none else v %}
+{% set err = errors.get(c.name) %}
+<div class="field">
+  {% if c.kind == 'boolean' %}
+  <div class="form-check">
+    <input class="form-check-input{% if err %} is-invalid{% endif %}" type="checkbox" id="f-{{ c.name }}" name="{{ c.name }}" value="1"{% if v in (1, '1', 'on', true) %} checked{% endif %}>
+    <label class="form-check-label" for="f-{{ c.name }}">{{ c.name|label }}</label>
+    {% if err %}<div class="invalid-feedback">{{ err }}</div>{% endif %}
+  </div>
+  {% else %}
+  <label class="form-label" for="f-{{ c.name }}">{{ c.name|label }}{% if c.required %}<span class="req" title="Required">*</span>{% endif %}</label>
+  {% if c.ref %}
+  <div class="input-group fk-picker{% if err %} has-validation{% endif %}" data-fk>
+    <input type="hidden" name="{{ c.name }}" value="{{ v }}" data-fk-value>
+    <input type="text" class="form-control{% if err %} is-invalid{% endif %}" id="f-{{ c.name }}" value="{{ labels.get(c.name, '') }}" placeholder="Click to choose a {{ c.ref.table|label }}…" readonly data-fk-label>
+    <a class="btn btn-outline-secondary" href="{{ url_for('crud.list_records', name=c.ref.table, modal=1) }}" data-pick data-title="Choose {{ c.ref.table|label }}" title="Choose"><i class="bi bi-search"></i></a>
+    {% if not c.required %}<button type="button" class="btn btn-outline-secondary" data-fk-clear title="Clear"><i class="bi bi-x-lg"></i></button>{% endif %}
+    {% if err %}<div class="invalid-feedback">{{ err }}</div>{% endif %}
+  </div>
+  {% elif c.kind == 'enum' %}
+  <select class="form-select{% if err %} is-invalid{% endif %}" id="f-{{ c.name }}" name="{{ c.name }}"{% if c.enum_notes %} data-enum-hint{% endif %}>
+    <option value=""{% if v == '' %} selected{% endif %}>{{ 'Choose…' if c.required else '(none)' }}</option>
+    {% for opt in c.enum_values %}
+    <option value="{{ opt }}"{% if v == opt %} selected{% endif %}{% if c.enum_notes.get(opt) %} data-note="{{ c.enum_notes[opt] }}"{% endif %}>{{ opt }}</option>
+    {% endfor %}
+  </select>
+  {% if c.enum_notes %}<div class="form-text enum-hint dbml-note" data-enum-hint-text>{{ c.enum_notes.get(v, '') }}</div>{% endif %}
+  {% elif c.multiline %}
+  <textarea class="form-control{% if err %} is-invalid{% endif %}" id="f-{{ c.name }}" name="{{ c.name }}" rows="3" placeholder="Enter {{ c.name|label }}" data-autogrow>{{ v }}</textarea>
+  {% else %}
+  {% set input_type = {'integer': 'number', 'real': 'number', 'date': 'date', 'datetime': 'datetime-local'}.get(c.kind, 'text') %}
+  <input class="form-control{% if err %} is-invalid{% endif %}" type="{{ input_type }}" id="f-{{ c.name }}" name="{{ c.name }}" value="{{ v }}"{% if input_type in ('text', 'number') %} placeholder="Enter {{ c.name|label }}"{% endif %}{% if c.max_length %} maxlength="{{ c.max_length }}"{% endif %}{% if c.kind == 'real' %} step="any"{% endif %}>
+  {% endif %}
+  {% if err and not c.ref %}<div class="invalid-feedback">{{ err }}</div>{% endif %}
+  {% endif %}
+  {% if c.note %}<div class="form-text md">{{ c.note|markdown }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{# Many-to-many field: chips for the linked records, plus an Add button that opens the picker. #}
+{% macro link_field(link, items, errors) %}
+{% set err = errors.get(link.field) %}
+<div class="field" data-m2m data-name="{{ link.field }}">
+  <label class="form-label d-block">{{ link.other_table|label }}</label>
+  <div class="m2m-box">
+    {% for item in items %}
+    <span class="m2m-chip" data-m2m-item>
+      <input type="hidden" name="{{ link.field }}" value="{{ item.id }}">{{ item.label }}
+      <button type="button" class="btn-close btn-close-white" data-m2m-remove aria-label="Remove"></button>
+    </span>
+    {% endfor %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('crud.list_records', name=link.other_table, modal=1) }}" data-pick data-title="Add {{ link.other_table|label }}"><i class="bi bi-plus-lg"></i> Add {{ link.other_table|label }}</a>
+  </div>
+  {% if err %}<div class="invalid-feedback d-block">{{ err }}</div>{% endif %}
+</div>
+{% endmacro %}

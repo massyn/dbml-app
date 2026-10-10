@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}{{ table.name|label }}{% endblock %}
+{% block content %}
+<div class="page-head"{% if table.header_color %} style="--table-accent: {{ table.header_color }}"{% endif %}>
+  <div>
+    <div class="eyebrow">Table</div>
+    <h1>{{ table.name|label }}</h1>
+    {% if table.note %}<div class="lead-note md">{{ table.note|markdown }}</div>{% endif %}
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('crud.new_record', name=table.name) }}"><i class="bi bi-plus-lg"></i> New {{ table.name|label }}</a>
+</div>
+<div class="panel">
+  {% include '_list.html' %}
+</div>
+{% endblock %}

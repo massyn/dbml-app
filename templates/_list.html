@@ -1,0 +1,85 @@
+{# Record list. Page mode: rows open the edit page. Modal mode: rows select the record. #}
+{% set extra = {'modal': 1} if modal else {} %}
+{% set visible = table.list_columns %}
+<div class="list-toolbar">
+  <form class="search-field" method="get" action="{{ url_for('crud.list_records', name=table.name) }}" role="search"{% if modal %} data-modal-search{% endif %}>
+    {% if modal %}<input type="hidden" name="modal" value="1">{% endif %}
+    <input type="hidden" name="sort" value="{{ page.sort }}">
+    <input type="hidden" name="dir" value="{{ page.direction }}">
+    <i class="bi bi-search"></i>
+    <input class="form-control" type="search" name="q" value="{{ page.search }}" placeholder="Search {{ table.name|label }}… (press Enter)" aria-label="Search {{ table.name|label }}">
+  </form>
+  {% if modal %}
+  <a class="btn btn-primary" href="{{ url_for('crud.new_record', name=table.name, modal=1) }}" data-modal-push data-title="New {{ table.name|label }}" data-select-on-save><i class="bi bi-plus-lg"></i> New</a>
+  {% endif %}
+</div>
+
+<div class="table-responsive data-table-wrap">
+<table class="table table-hover align-middle data-table">
+  <thead>
+    <tr>
+      {% for c in visible %}
+      {% set next_dir = 'desc' if page.sort == c.name and page.direction == 'asc' else 'asc' %}
+      <th{% if c.auto %} class="col-id"{% endif %}{% if c.note %} title="{{ c.note }}"{% endif %}>
+        <a href="{{ url_for('crud.list_records', name=table.name, q=page.search, sort=c.name, dir=next_dir, **extra) }}"{% if modal %} data-modal-link{% endif %}>
+          {{ c.name|label }}{% if page.sort == c.name %} <i class="bi bi-caret-{{ 'up' if page.direction == 'asc' else 'down' }}-fill"></i>{% endif %}
+        </a>
+      </th>
+      {% endfor %}
+      {% for link in table.links %}<th>{{ link.other_table|label }}</th>{% endfor %}
+      {% if modal %}<th></th>{% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in page.rows %}
+    {% set pk = row[table.pk.name] %}
+    {% set label = row[table.display_column.name] %}
+    {% if modal %}
+    <tr class="clickable" data-select data-id="{{ pk }}" data-label="{{ pk if label is none else label }}">
+    {% else %}
+    <tr class="clickable" data-href="{{ url_for('crud.edit_record', name=table.name, pk=pk) }}">
+    {% endif %}
+      {% for c in visible %}
+      {% set v = row[c.name] %}
+      {% set shown = row['__label_' ~ c.name] if c.ref and row['__label_' ~ c.name] is not none else v %}
+      {% if c.auto %}
+      <td class="cell-id" title="{{ v }}">{{ v }}</td>
+      {% elif c.kind == 'text' and not c.ref and shown is not none %}
+      <td class="cell-clip" title="{{ shown }}">{{ shown }}</td>
+      {% else %}
+      <td>{% if c.kind == 'boolean' %}{% if v %}<i class="bi bi-check-lg"></i>{% endif %}{% elif shown is not none %}{{ shown }}{% endif %}</td>
+      {% endif %}
+      {% endfor %}
+      {% for link in table.links %}<td class="cell-clip" title="{{ row[link.field] or '' }}">{{ row[link.field] or '' }}</td>{% endfor %}
+      {% if modal %}
+      <td class="text-end">
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('crud.edit_record', name=table.name, pk=pk, modal=1) }}" data-modal-push data-title="Edit {{ table.name|label }}" title="Edit"><i class="bi bi-pencil"></i></a>
+      </td>
+      {% endif %}
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="{{ visible|length + table.links|length + (1 if modal else 0) }}" class="empty-state">
+        <i class="bi bi-inbox"></i>
+        {% if page.search %}No records match “{{ page.search }}”.{% else %}No records yet.{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div class="list-foot">
+  <span>{{ page.total }} record{{ '' if page.total == 1 else 's' }}</span>
+  {% if page.pages > 1 %}
+  <nav aria-label="Pages">
+    <ul class="pagination pagination-sm">
+      {% for p in range(1, page.pages + 1) %}
+      <li class="page-item{% if p == page.page %} active{% endif %}">
+        <a class="page-link" href="{{ url_for('crud.list_records', name=table.name, q=page.search, sort=page.sort, dir=page.direction, page=p, **extra) }}"{% if modal %} data-modal-link{% endif %}>{{ p }}</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>

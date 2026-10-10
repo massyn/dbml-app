@@ -1,0 +1,210 @@
+// The monster: every DBML feature and awkward case the parser must handle.
+// tests/test_dbml.py asserts on each section below. Keep the two in step.
+
+/* A block comment
+   spanning several lines, with a fake keyword: Table nope { id int } */
+
+Project monster_project {
+  database_type: 'SQLite'
+  owner: 'platform team'   // custom project setting, then a comment
+  Note: '''
+    # Monster
+    Every **DBML** feature in one file.
+    - second line keeps its place
+  '''
+}
+
+// --- Enums ----------------------------------------------------------------------------
+
+enum core.job_status {
+  created [note: 'Waiting to be processed']
+  running
+  done
+  "on hold" [note: 'Quoted value with a space']
+}
+
+Enum grade {
+  "A+"
+  "A-"
+  "Not Yet Set"
+}
+
+// --- TablePartials --------------------------------------------------------------------
+
+TablePartial base_template [headercolor: #111111, note: 'Shared by every table'] {
+  id int [pk, increment]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+  indexes {
+    created_at [name: 'ix_created']
+  }
+}
+
+TablePartial audit_template {
+  updated_at "timestamp with time zone" [note: 'Later partial wins']
+  created_by varchar(100)
+}
+
+// --- Tables ---------------------------------------------------------------------------
+
+Table core.users as U [headercolor: #3498DB, note: 'Table note in settings', owner: 'identity'] {
+  id int [pk, increment]
+  username varchar(255) [not null, unique, note: 'Login name']
+  email varchar [unique, null]
+  "Full Name" varchar(200) [note: 'Quoted column name with a space']
+  age int [default: 21, check: `age >= 0`]
+  balance decimal(10,2) [default: -1.5]
+  ratio "double precision" [default: 1.5e3]
+  code "character varying(20)"
+  seen_at "timestamp with time zone" [default: `now() - interval '5 days'`]
+  tags varchar[]
+  status core.job_status [default: 'created']
+  grade grade
+  is_admin boolean [default: false]
+  is_active bool [default: true]
+  nickname text [default: null]
+  motto text [default: 'It\'s fine']
+  bio text [note: '''
+    A multi-line note
+    on a column
+  ''']
+  note varchar [note: 'A column named note']
+  records int [note: 'A column named records']
+  indexes int [note: 'A column named indexes']
+  legacy_id int [classification: 'internal', note: 'Custom column property']
+
+  indexes {
+    username
+    (username, email) [unique, name: 'uq_users_login']
+    (`lower(email)`) [name: 'ix_email_lower', type: hash]
+    (`id * 3`, age) [note: 'Mixed expression and column']
+    email [type: btree]
+  }
+
+  checks {
+    `age < 200` [name: 'chk_age_upper']
+    `balance > -1000`
+  }
+
+  Note {
+    'Note block form overrides the settings note'
+  }
+}
+
+TABLE orders {
+  id int [primary key]
+  user_id int [not null, ref: > U.id]
+  ship_to_user_id int [ref: > core.users.id]
+  total decimal(12, 2) [not null, default: 0]
+  status core.job_status
+  placed_at timestamp
+  coupon_tag_id int
+  Note: 'Orders are placed by users'
+
+  records (id, user_id, total, status, placed_at) {
+    1, 1, 99.5, core.job_status.done, '2024-01-15 10:30:00'
+    2, 1, -3, 'running', `now()`   // negative number, literal enum, expression
+    3, 2, 1.5e2, , null
+  }
+}
+
+table order_items {
+  order_id int [ref: > orders.id]
+  product_id int
+  quantity int [default: 1]
+  indexes {
+    (order_id, product_id) [pk]
+  }
+}
+
+Table products {
+  id int [pk]
+  merchant_id int
+  country_code varchar(2)
+  name varchar
+  records {
+    10, 1, 'AU', 'Widget, large'
+    11, 1, 'NZ', "Gadget"
+  }
+}
+
+Table merchants {
+  id int
+  country_code varchar(2)
+  name varchar
+  indexes {
+    (id, country_code) [pk]
+  }
+}
+
+Table user_profiles {
+  user_id int [pk, ref: - core.users.id]
+  website varchar
+  favourite_tag varchar
+}
+
+Table tags {
+  id int [pk]
+  label varchar [unique]
+}
+
+Table audited {
+  ~base_template
+  title varchar [not null]
+  ~audit_template
+  updated_at date [note: 'The table definition wins over both partials']
+}
+
+// --- Refs -----------------------------------------------------------------------------
+
+Ref: order_items.product_id > products.id [delete: cascade, update: no action]
+Ref fk_merchant: products.(merchant_id, country_code) > merchants.(id, country_code) [delete: set null, color: #79AD51]
+Ref product_tags {
+  products.id <> tags.id
+}
+Ref {
+  user_profiles.website > tags.label
+}
+Ref: order_items.quantity > tags.id
+REF optional_one: orders.coupon_tag_id >? tags.id
+Ref optional_other: tags.label ?< user_profiles.favourite_tag [update: restrict, delete: set default]
+
+// --- Records at the top level ---------------------------------------------------------
+
+records core.users(id, username, email, "Full Name", is_admin, is_active, motto) {
+  1, 'alice', 'alice@example.com', 'Alice Smith', TRUE, false, 'Say \'hi\''
+  2, 'bob', null, '''Bob
+  Jones''', False, True, ''
+  3, 'carol', 'carol@example.com', 'Carol', true, true,  // trailing comma: empty last field
+}
+
+records tags(id, label) {
+  1, 'first tag'
+}
+
+// --- Groups and sticky notes ----------------------------------------------------------
+
+TableGroup commerce [note: 'Everything about orders', color: #E67E22] {
+  orders
+  order_items
+  public.products
+  U
+  Note: 'Note inside the group overrides the setting'
+}
+
+TableGroup "Reference data" {
+  tags
+  merchants
+}
+
+Note sticky_one {
+  'A single-line sticky note'
+}
+
+Note sticky_two {
+  '''
+  A multi-line sticky note \
+  joined by a trailing backslash.
+  Second line.
+  '''
+}

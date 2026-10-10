@@ -1,0 +1,174 @@
+Project metrics_library {
+  database_type: 'SQLite'
+  Note: '''
+  # Security metrics library
+  Metrics are the centre of this model, aligned with the
+  [cyber-metrics](https://github.com/massyn/cyber-metrics) library definitions.
+
+  - A **metric** measures one or more **controls**, and gives visibility of **risks**.
+  - A **control** mitigates **risks**.
+  - Metrics map to **framework references** (ISO 27001, CIS, NIST CSF, Essential Eight).
+
+  Risks and controls are kept deliberately simple: what they are, not how they are rated.
+  '''
+}
+
+// ---------------------------------------------------------------------------
+// Metrics
+// ---------------------------------------------------------------------------
+
+Enum domain {
+  "Access Control"
+  "Application Security"
+  "Asset Management"
+  "Data Protection"
+  "Disaster Recovery"
+  "Endpoint Security"
+  "Identity Management"
+  "Network Security"
+  "User Security"
+  "Vulnerability Management"
+}
+
+Enum metric_type {
+  control [note: 'Tracks the implementation of actions, processes or technologies that reduce risk']
+  risk [note: 'Gives visibility of existing or potential risks and areas of vulnerability']
+  performance [note: 'Measures how quickly and efficiently a team delivers on controls and operational tasks']
+}
+
+Table metric [headercolor: #36D1B5] {
+  id uuid [pk]
+  title varchar(200) [unique, not null, note: 'Display name, e.g. **Identity Management - Multi-Factor Authentication Coverage**']
+  metric_id varchar(50) [unique, not null, note: 'Stable identifier from the metrics library, e.g. `im_authentication_mfa`']
+  domain domain [not null]
+  type metric_type [not null]
+  description text [note: 'What the metric measures and why it matters']
+  how text [note: 'How it is measured: the data sources and the logic']
+  query text [note: 'SQL that scores each resource. Must return `resource`, `resource_type`, `compliance` (0 or 1) and `detail`']
+  slo_min decimal [not null, default: 0.9, note: 'Minimum acceptable score, as a fraction (0.9 = 90%)']
+  slo_target decimal [not null, default: 0.95, note: 'Target score, as a fraction (0.95 = 95%)']
+  weight decimal [not null, default: 0.5, note: 'Weight in the overall and domain scores']
+  indicator bool [not null, default: false, note: 'Not percentage-based: left out of the weighted scores']
+  enabled bool [not null, default: true]
+
+  Note: 'A security metric: what is measured, how, and the service level it is held to'
+
+  records (title, metric_id, domain, type, description, how, slo_min, slo_target, weight, indicator, enabled) {
+    'Identity Management - Multi-Factor Authentication Coverage', 'im_authentication_mfa', 'Identity Management', metric_type.risk, 'The percentage of user accounts secured with multi-factor authentication.', 'Find all active Okta users and their enrolled factors. A user is compliant with at least one active MFA factor.', 0.9, 0.95, 0.5, false, true
+    'Access Control - Leavers with Disabled Accounts', 'ac_leavers_disabled', 'Access Control', metric_type.control, 'The percentage of people who have left the organisation whose identity account has been disabled.', 'Join staff records with an employment end date to identity accounts, and check each account is disabled.', 0.9, 0.95, 0.8, false, true
+    'Vulnerability Management - Agent Deployment Coverage', 'vm_coverage', 'Vulnerability Management', metric_type.control, 'The percentage of systems with up-to-date vulnerability management agents deployed.', 'Compare the asset inventory with the hosts reporting to the vulnerability management agent.', 0.9, 0.95, 0.4, false, true
+    'Vulnerabilities not remediated within SLO - patchable', 'vm_performance_patchable', 'Vulnerability Management', metric_type.performance, 'The percentage of active systems that resolved patchable vulnerabilities within the agreed SLO.', 'Join active hosts with open vulnerabilities that have a patch, and compare their age with the SLO.', 0.9, 0.95, 0.5, false, true
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Controls and risks: what they are, not how they are rated
+// ---------------------------------------------------------------------------
+
+Table control [headercolor: #8E44AD] {
+  id uuid [pk]
+  name varchar(200) [unique, not null]
+  domain domain
+  description text [note: 'What the control does']
+
+  Note: 'A safeguard the organisation operates, measured by one or more metrics'
+
+  records (name, domain, description) {
+    'Multi-factor authentication', 'Identity Management', 'All user accounts must authenticate with more than one factor.'
+    'Leaver access removal', 'Access Control', 'Accounts of people who leave are disabled on their last day.'
+    'Vulnerability management', 'Vulnerability Management', 'Systems are scanned for vulnerabilities, and findings are remediated within the agreed SLO.'
+  }
+}
+
+Table risk [headercolor: #E74C3C] {
+  id uuid [pk]
+  name varchar(200) [unique, not null]
+  description text [note: 'What could happen, and the impact']
+
+  Note: 'A risk the organisation is managing. No ratings: just the risk itself'
+
+  records (name, description) {
+    'Account takeover', 'An attacker uses stolen or guessed credentials to access company systems.'
+    'Former staff access', 'People who have left keep access to company systems and data.'
+    'Exploitation of known vulnerabilities', 'An attacker exploits an unpatched, publicly known vulnerability.'
+  }
+}
+
+// A metric measures controls and gives visibility of risks; a control mitigates risks
+Ref: metric.id <> control.id
+Ref: metric.id <> risk.id
+Ref: control.id <> risk.id
+
+// ---------------------------------------------------------------------------
+// Frameworks
+// ---------------------------------------------------------------------------
+
+Table framework [headercolor: #2A8FD6] {
+  id int [pk, increment]
+  name varchar(100) [unique, not null]
+  link varchar(500)
+
+  Note: 'A compliance framework metrics are mapped to'
+
+  records (id, name, link) {
+    1, 'ISO 27001:2022', 'https://www.iso.org/standard/27001'
+    2, 'CIS 8.1', 'https://www.cisecurity.org/controls/v8-1'
+    3, 'NIST CSF v2.0', 'https://csf.tools/reference/nist-cybersecurity-framework/v2-0/'
+    4, 'Essential8-ML1', 'https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/essential-eight'
+    5, 'Essential8-ML2', 'https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/essential-eight'
+    6, 'Essential8-ML3', 'https://www.cyber.gov.au/resources-business-and-government/essential-cyber-security/essential-eight'
+  }
+}
+
+Table framework_reference [headercolor: #2A8FD6] {
+  id int [pk, increment]
+  reference varchar(150) [unique, not null, note: 'Framework and clause together, e.g. `ISO 27001:2022 A.8.8`']
+  framework_id int [not null, ref: > framework.id]
+  clause varchar(50) [not null, note: 'The clause as the framework numbers it, e.g. `A.8.8`']
+  domain varchar(200)
+  title varchar(500)
+  link varchar(500)
+
+  indexes {
+    (framework_id, clause) [unique]
+  }
+
+  Note: 'One requirement (clause) of a framework'
+
+  records (id, reference, framework_id, clause, domain, title) {
+    1, 'ISO 27001:2022 A.5.17', 1, 'A.5.17', '5 Organizational controls', 'Authentication information'
+    2, 'ISO 27001:2022 A.5.18', 1, 'A.5.18', '5 Organizational controls', 'Access rights'
+    3, 'ISO 27001:2022 A.8.8', 1, 'A.8.8', '8 Technological controls', 'Management of technical vulnerabilities'
+    4, 'CIS 8.1 6.2', 2, '6.2', 'Access Control Management', 'Establish an Access Revoking Process'
+    5, 'CIS 8.1 6.3', 2, '6.3', 'Access Control Management', 'Require MFA for Externally-Exposed Applications'
+    6, 'CIS 8.1 7.5', 2, '7.5', 'Continuous Vulnerability Management', 'Perform Automated Vulnerability Scans of Internal Enterprise Assets'
+    7, 'CIS 8.1 7.7', 2, '7.7', 'Continuous Vulnerability Management', 'Remediate Detected Vulnerabilities'
+    8, 'NIST CSF v2.0 ID.RA-01', 3, 'ID.RA-01', 'Risk Assessment (ID.RA)', 'Vulnerabilities in assets are identified, validated, and recorded'
+    9, 'NIST CSF v2.0 PR.AA-03', 3, 'PR.AA-03', 'Identity Management, Authentication, and Access Control (PR.AA)', 'Users, services, and hardware are authenticated'
+    10, 'NIST CSF v2.0 PR.AA-05', 3, 'PR.AA-05', 'Identity Management, Authentication, and Access Control (PR.AA)', 'Access permissions are defined in a policy, managed, enforced, and reviewed'
+  }
+}
+
+Ref: metric.id <> framework_reference.id
+
+// ---------------------------------------------------------------------------
+// Navigation
+// ---------------------------------------------------------------------------
+
+TableGroup Metrics [note: 'The heart of the library'] {
+  metric
+}
+
+TableGroup "Controls and risks" {
+  control
+  risk
+}
+
+TableGroup Frameworks {
+  framework
+  framework_reference
+}
+
+Note relationships {
+  'Link records from either side: open a **metric** to add the controls it measures, the risks it covers and the framework references it maps to.'
+}

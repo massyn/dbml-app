@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'New' if pk is none else 'Edit' }} {{ table.name|label }}{% endblock %}
+{% block content %}
+<div class="form-page">
+<div class="page-head"{% if table.header_color %} style="--table-accent: {{ table.header_color }}"{% endif %}>
+  <div>
+    <div class="eyebrow"><a href="{{ url_for('crud.list_records', name=table.name) }}" class="text-reset text-decoration-none"><i class="bi bi-arrow-left"></i> {{ table.name|label }}</a></div>
+    <h1>{{ 'New' if pk is none else 'Edit' }} {{ table.name|label }}</h1>
+    {% if table.note %}<div class="lead-note md">{{ table.note|markdown }}</div>{% endif %}
+  </div>
+  {% if pk is not none %}
+  <button class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal"><i class="bi bi-trash"></i> Delete</button>
+  {% endif %}
+</div>
+<div class="panel panel-pad">{% include '_form.html' %}</div>
+</div>
+
+{% if pk is not none %}
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Delete {{ table.name|label }}?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">This cannot be undone.</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form method="post" action="{{ url_for('crud.delete_record', name=table.name, pk=pk) }}">
+          <button class="btn btn-danger" type="submit">Delete</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

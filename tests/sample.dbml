@@ -1,0 +1,25 @@
+Table metric {
+  id uuid [pk, not null]
+  name text [unique]
+  description text
+}
+
+Table control {
+  id uuid [pk, not null]
+  name varchar [not null]
+  domain domain
+
+  indexes {
+    (name, domain) [unique]
+  }
+}
+
+Ref: metric.id <> control.id
+
+Enum domain {
+  daily
+  weekly
+  monthly
+  quarterly
+  yearly
+}
