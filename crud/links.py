@@ -10,21 +10,6 @@ def _target(schema: Schema, link: Link) -> dict:
     return {"other_pk": other.pk.name, "display": other.display_column.name}
 
 
-def list_specs(schema: Schema, table: Table) -> list[dict]:
-    """What record_list.sql needs to show each link as a comma-separated column."""
-    return [
-        {
-            "field": link.field,
-            "join_table": link.join_table,
-            "other_table": link.other_table,
-            "self_column": link.self_column,
-            "other_column": link.other_column,
-            **_target(schema, link),
-        }
-        for link in table.links
-    ]
-
-
 def linked(schema: Schema, table: Table, pk: str) -> dict[str, list[dict]]:
     """The records currently linked to pk, as {field: [{id, label}]}."""
     return {

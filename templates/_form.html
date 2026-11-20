@@ -2,18 +2,15 @@
 {% from '_field.html' import field, link_field %}
 {% set extra = {'modal': 1} if modal else {} %}
 {% set action = url_for('crud.new_record', name=table.name, **extra) if pk is none else url_for('crud.edit_record', name=table.name, pk=pk, **extra) %}
-{% if form_error %}<div class="alert alert-danger">{{ form_error }}</div>{% endif %}
+{% if form_error %}<div class="alert alert-danger form-error">{{ form_error }}</div>{% endif %}
 <form method="post" action="{{ action }}" novalidate>
-  {% if pk is not none or table.pk.auto %}
-  <div class="field">
-    <div class="form-label">{{ table.pk.name|label }}</div>
-    <div class="id-value">{{ pk if pk is not none else 'Assigned automatically when saved' }}</div>
-  </div>
-  {% endif %}
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="form-grid">
   {% for c in columns %}{{ field(c, values, labels, errors) }}{% endfor %}
   {% for link, items in links %}{{ link_field(link, items, errors) }}{% endfor %}
+  </div>
   <div class="form-actions">
-    <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Save</button>
+    <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg"></i> Save {{ table.name|label }}</button>
     {% if modal %}
     <button class="btn btn-outline-secondary" type="button" data-modal-back>Cancel</button>
     {% else %}
@@ -22,8 +19,9 @@
   </div>
 </form>
 {% if modal and pk is not none %}
-<form class="form-actions mt-3" method="post" action="{{ url_for('crud.delete_record', name=table.name, pk=pk, modal=1) }}">
+<form class="form-actions delete-actions" method="post" action="{{ url_for('crud.delete_record', name=table.name, pk=pk, modal=1) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <button class="btn btn-outline-danger" type="button" data-confirm-reveal><i class="bi bi-trash"></i> Delete</button>
-  <button class="btn btn-danger d-none" type="submit" data-confirm-submit>Confirm delete</button>
+  <button class="btn btn-danger d-none" type="submit" data-confirm-submit>Delete this {{ table.name|label }}</button>
 </form>
 {% endif %}

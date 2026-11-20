@@ -3,10 +3,12 @@
 {% set v = values.get(c.name) %}
 {% set v = '' if v is none else v %}
 {% set err = errors.get(c.name) %}
-<div class="field">
+{# Long text spans both form columns; everything else takes one. #}
+{% set wide = c.multiline or (c.kind == 'text' and not c.ref and (c.max_length or 0) > 100) %}
+<div class="field{% if wide %} field--wide{% endif %}">
   {% if c.kind == 'boolean' %}
-  <div class="form-check">
-    <input class="form-check-input{% if err %} is-invalid{% endif %}" type="checkbox" id="f-{{ c.name }}" name="{{ c.name }}" value="1"{% if v in (1, '1', 'on', true) %} checked{% endif %}>
+  <div class="form-check form-switch">
+    <input class="form-check-input{% if err %} is-invalid{% endif %}" type="checkbox" role="switch" id="f-{{ c.name }}" name="{{ c.name }}" value="1"{% if v in (1, '1', 'on', true) %} checked{% endif %}>
     <label class="form-check-label" for="f-{{ c.name }}">{{ c.name|label }}</label>
     {% if err %}<div class="invalid-feedback">{{ err }}</div>{% endif %}
   </div>
@@ -43,8 +45,8 @@
 {# Many-to-many field: chips for the linked records, plus an Add button that opens the picker. #}
 {% macro link_field(link, items, errors) %}
 {% set err = errors.get(link.field) %}
-<div class="field" data-m2m data-name="{{ link.field }}">
-  <label class="form-label d-block">{{ link.other_table|label }}</label>
+<div class="field field--wide" data-m2m data-name="{{ link.field }}">
+  <label class="form-label">{{ link.other_table|label }}</label>
   <div class="m2m-box">
     {% for item in items %}
     <span class="m2m-chip" data-m2m-item>

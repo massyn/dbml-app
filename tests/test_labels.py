@@ -10,6 +10,14 @@ def test_label_turns_names_into_display_text():
     assert label("__odd__name_") == "Odd Name"  # stray underscores collapse
 
 
+def test_label_writes_common_acronyms_in_capitals():
+    assert label("metric_id") == "Metric ID"
+    assert label("slo_min") == "SLO Min"
+    assert label("api_url") == "API URL"
+    assert label("Id") == "Id"  # a word the author capitalised is left alone
+    assert label("idea") == "Idea"  # whole words only
+
+
 def test_labels_on_screen_but_raw_names_in_urls_and_fields(make_app):
     client = make_app(
         "Table order_line {\n  id int [pk]\n  order_number varchar\n}\n"

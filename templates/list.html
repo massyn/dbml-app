@@ -1,15 +1,16 @@
 {% extends 'base.html' %}
 {% block title %}{{ table.name|label }}{% endblock %}
 {% block content %}
-<div class="page-head"{% if table.header_color %} style="--table-accent: {{ table.header_color }}"{% endif %}>
+<div class="list-page"{% if table.header_color %} style="--table-accent: {{ table.header_color }}"{% endif %}>
+<header class="page-head">
   <div>
-    <div class="eyebrow">Table</div>
-    <h1>{{ table.name|label }}</h1>
+    <div class="title-row"><span class="swatch" aria-hidden="true"></span><h1>{{ table.name|label }}</h1></div>
     {% if table.note %}<div class="lead-note md">{{ table.note|markdown }}</div>{% endif %}
   </div>
   <a class="btn btn-primary" href="{{ url_for('crud.new_record', name=table.name) }}"><i class="bi bi-plus-lg"></i> New {{ table.name|label }}</a>
-</div>
+</header>
 <div class="panel">
   {% include '_list.html' %}
+</div>
 </div>
 {% endblock %}

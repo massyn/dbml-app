@@ -49,7 +49,10 @@ def list_records(
     direction: str = "asc",
     page: int = 1,
     page_size: int = 25,
+    filters: dict[str, Any] | None = None,
 ) -> Page:
+    """One page of rows. filters: {column: value}, all of which must match."""
+    filters = filters or {}
     fks = _fks(schema, table)
     names = [c.name for c in table.columns]
     sort = sort if sort in names else table.display_column.name
@@ -70,20 +73,21 @@ def list_records(
         search_cols = [("t", n) for n in names] + [
             (f"j{i}", fk["display"]) for i, fk in enumerate(fks, 1)
         ]
-    search_params = [f"%{search}%"] * len(search_cols)
+    where_params = list(filters.values()) + [f"%{search}%"] * len(search_cols)
+    sql_args = {
+        "table": table,
+        "fks": fks,
+        "search": search_cols,
+        "filters": list(filters),
+    }
 
-    total = db.query_one(
-        "record_count.sql", search_params, table=table, fks=fks, search=search_cols
-    )["n"]
+    total = db.query_one("record_count.sql", where_params, **sql_args)["n"]
     pages = max(1, math.ceil(total / page_size))
     page = min(max(1, page), pages)
     rows = db.query(
         "record_list.sql",
-        search_params + [page_size, (page - 1) * page_size],
-        table=table,
-        fks=fks,
-        search=search_cols,
-        links=links.list_specs(schema, table),
+        where_params + [page_size, (page - 1) * page_size],
+        **sql_args,
         sort=sort_by,
         direction=direction.upper(),
     )
@@ -91,7 +95,9 @@ def list_records(
 
 
 def count(table: Table) -> int:
-    return db.query_one("record_count.sql", table=table, fks=[], search=[])["n"]
+    return db.query_one("record_count.sql", table=table, fks=[], search=[], filters=[])[
+        "n"
+    ]
 
 
 def get_record(table: Table, pk: str) -> dict | None:
