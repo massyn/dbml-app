@@ -93,15 +93,13 @@ def test_edit_updates_record(make_app):
     assert ">new</textarea>" in form
 
 
-def test_generated_id_is_shown_read_only(make_app):
+def test_generated_id_is_not_on_the_form(make_app):
     client = make_app(TEXT_ONLY).test_client()
     doc = _create(client, "doc", body="b")
     form = client.get(f"/t/doc/{doc}/edit").get_data(as_text=True)
-    assert f'<div class="id-value">{doc}</div>' in form
     assert f'name="id" value="{doc}"' not in form  # not an editable field
-    assert "Assigned automatically when saved" in client.get("/t/doc/new").get_data(
-        as_text=True
-    )
+    assert f">{doc}<" not in form  # and not shown either
+    assert 'for="f-id"' not in client.get("/t/doc/new").get_data(as_text=True)
     # doc has only multi-line text, so its list falls back to the key
     listing = client.get("/t/doc").get_data(as_text=True)
     assert f'<td class="cell-id" title="{doc}">' in listing
@@ -133,10 +131,10 @@ def test_links_saved_from_either_side(client):
     edit = client.get(f"/t/metric/{metric}/edit").get_data(as_text=True)
     assert "Vuln mgmt" in edit and "Asset inventory" in edit
 
-    # The control side sees the same link, and the list shows linked labels.
+    # The control side sees the same link; lists leave links to the form.
     assert "Patch latency" in client.get(f"/t/control/{c1}/edit").get_data(as_text=True)
     listing = client.get("/t/metric").get_data(as_text=True)
-    assert "Vuln mgmt" in listing and "Asset inventory" in listing
+    assert "Vuln mgmt" not in listing and "Asset inventory" not in listing
 
     # Submitting without the field clears the links.
     client.post(f"/t/metric/{metric}/edit", data={"name": "Patch latency"})

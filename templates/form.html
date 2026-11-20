@@ -1,18 +1,29 @@
 {% extends 'base.html' %}
 {% block title %}{{ 'New' if pk is none else 'Edit' }} {{ table.name|label }}{% endblock %}
 {% block content %}
-<div class="form-page">
-<div class="page-head"{% if table.header_color %} style="--table-accent: {{ table.header_color }}"{% endif %}>
+<div class="form-page"{% if table.header_color %} style="--table-accent: {{ table.header_color }}"{% endif %}>
+<header class="page-head">
   <div>
-    <div class="eyebrow"><a href="{{ url_for('crud.list_records', name=table.name) }}" class="text-reset text-decoration-none"><i class="bi bi-arrow-left"></i> {{ table.name|label }}</a></div>
-    <h1>{{ 'New' if pk is none else 'Edit' }} {{ table.name|label }}</h1>
+    <a class="back-link" href="{{ url_for('crud.list_records', name=table.name) }}"><i class="bi bi-arrow-left"></i> All {{ table.name|label }} records</a>
+    <div class="title-row"><span class="swatch" aria-hidden="true"></span><h1>{{ 'New' if pk is none else 'Edit' }} {{ table.name|label }}</h1></div>
     {% if table.note %}<div class="lead-note md">{{ table.note|markdown }}</div>{% endif %}
   </div>
   {% if pk is not none %}
   <button class="btn btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal"><i class="bi bi-trash"></i> Delete</button>
   {% endif %}
-</div>
+</header>
 <div class="panel panel-pad">{% include '_form.html' %}</div>
+
+{# Records in other tables that point at this one, loaded into each panel by crud.js. #}
+{% for r in related %}
+{% set child = all_tables[r.table] %}
+<section class="related-records"{% if child.header_color %} style="--table-accent: {{ child.header_color }}"{% endif %}>
+  <h2 class="section-title"><span class="swatch" aria-hidden="true"></span>{{ r.title }}</h2>
+  <div class="panel" data-embed data-url="{{ url_for('crud.list_records', name=r.table, embed=1, **r.args) }}">
+    <div class="empty-state">Loading…</div>
+  </div>
+</section>
+{% endfor %}
 </div>
 
 {% if pk is not none %}
@@ -23,11 +34,12 @@
         <h5 class="modal-title">Delete {{ table.name|label }}?</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body">This cannot be undone.</div>
+      <div class="modal-body">This removes the record for good. It cannot be undone.</div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
         <form method="post" action="{{ url_for('crud.delete_record', name=table.name, pk=pk) }}">
-          <button class="btn btn-danger" type="submit">Delete</button>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-danger" type="submit">Delete {{ table.name|label }}</button>
         </form>
       </div>
     </div>

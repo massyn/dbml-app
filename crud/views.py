@@ -1,8 +1,12 @@
 """CRUD routes for every table in the DBML schema.
 
 Each view renders a full page, or — with ?modal=1 — a fragment for the picker modal,
-in which case writes answer with JSON instead of redirecting.
+in which case writes answer with JSON instead of redirecting. Lists also render with
+?embed=1 as a fragment for the related-records panels on a parent's edit page.
 """
+
+import logging
+from urllib.parse import urlsplit
 
 from flask import (
     Blueprint,
@@ -15,14 +19,25 @@ from flask import (
     request,
     url_for,
 )
+from flask_wtf.csrf import CSRFError
 
-from . import get_schema, links, records
-from .forms import editable_columns, parse_form, parse_links
+from . import get_schema, links, records, related
+from .forms import (
+    FILTER_PREFIX,
+    editable_columns,
+    parse_filters,
+    parse_form,
+    parse_links,
+)
 from .labels import label
 from .model import Schema, Table
 from .records import RecordError
 
+logger = logging.getLogger(__name__)
+
 bp = Blueprint("crud", __name__)
+
+_CSRF_MESSAGE = "This form has expired. Please try again."
 
 
 def _schema() -> Schema:
@@ -40,6 +55,33 @@ def _modal() -> bool:
     return request.args.get("modal") == "1"
 
 
+def _embed() -> bool:
+    return request.args.get("embed") == "1"
+
+
+def _filters(table: Table) -> dict:
+    try:
+        return parse_filters(table, request.args)
+    except ValueError as exc:
+        abort(400, str(exc))
+
+
+@bp.app_errorhandler(CSRFError)
+def csrf_error(exc: CSRFError):
+    """A POST without a valid token: say so, and send the user back to retry."""
+    logger.warning("Refused %s %s: %s", request.method, request.path, exc.description)
+    if _modal():
+        return jsonify(ok=False, error=_CSRF_MESSAGE), 400
+    flash(_CSRF_MESSAGE, "danger")
+    # Only return to a page on this site; anything else goes home.
+    referrer = urlsplit(request.referrer or "")
+    if referrer.netloc == request.host and referrer.path:
+        back = referrer.path + (f"?{referrer.query}" if referrer.query else "")
+    else:
+        back = url_for("crud.index")
+    return redirect(back)
+
+
 @bp.get("/")
 def index():
     schema = _schema()
@@ -52,6 +94,7 @@ def index():
 @bp.get("/t/<name>")
 def list_records(name: str):
     table = _table(name)
+    filters = _filters(table)
     page = records.list_records(
         _schema(),
         table,
@@ -60,9 +103,27 @@ def list_records(name: str):
         direction=request.args.get("dir", "asc"),
         page=request.args.get("page", 1, type=int),
         page_size=current_app.config["PAGE_SIZE"],
+        filters=filters,
     )
-    template = "_list.html" if _modal() else "list.html"
-    return render_template(template, table=table, page=page, modal=_modal())
+    # Every link and form in the list keeps the mode and the filters.
+    filter_args = {FILTER_PREFIX + col: value for col, value in filters.items()}
+    nav_args = dict(filter_args)
+    if _modal():
+        nav_args["modal"] = 1
+    elif _embed():
+        nav_args["embed"] = 1
+    template = "_list.html" if _modal() or _embed() else "list.html"
+    return render_template(
+        template,
+        table=table,
+        page=page,
+        modal=_modal(),
+        embed=_embed(),
+        nav_args=nav_args,
+        filter_args=filter_args,
+        # A filtered column holds the same value on every row, so it is not shown.
+        columns=[c for c in table.list_columns if c.name not in filters] or [table.pk],
+    )
 
 
 def _form(table: Table, pk: str | None):
@@ -95,6 +156,8 @@ def _form(table: Table, pk: str | None):
         chosen = links.labelled(_schema(), table, selected)
     elif creating:
         shown = {c.name: c.default for c in table.columns if c.default is not None}
+        # f.<column> arguments prefill the form, e.g. a new child from its parent's page.
+        shown |= _filters(table)
         chosen = {link.field: [] for link in table.links}
     else:
         shown = row
@@ -110,6 +173,7 @@ def _form(table: Table, pk: str | None):
         "errors": errors,
         "form_error": form_error,
         "modal": _modal(),
+        "related": [] if creating else related.for_record(_schema(), table, row),
     }
     if _modal():
         if request.method == "POST":

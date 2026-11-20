@@ -9,6 +9,9 @@ from werkzeug.datastructures import MultiDict
 
 from .model import Column, Schema, Table
 
+# Query string prefix for an equality filter on a column: ?f.owner_id=42
+FILTER_PREFIX = "f."
+
 
 def _convert(column: Column, raw: str) -> Any:
     """Convert one non-empty raw value. Raises ValueError with a user-facing message."""
@@ -76,6 +79,22 @@ def parse_form(
         except ValueError as exc:
             errors[column.name] = str(exc)
     return values, errors
+
+
+def parse_filters(table: Table, args: Mapping[str, str]) -> dict[str, Any]:
+    """Return {column: value} for the f.<column> arguments. Raises ValueError for an
+    unknown column or a value of the wrong type."""
+    filters: dict[str, Any] = {}
+    for key, raw in args.items():
+        if not key.startswith(FILTER_PREFIX):
+            continue
+        name = key.removeprefix(FILTER_PREFIX)
+        try:
+            column = table.column(name)
+        except KeyError:
+            raise ValueError(f"No column '{name}' in '{table.name}'") from None
+        filters[name] = _convert(column, raw.strip())
+    return filters
 
 
 def parse_links(

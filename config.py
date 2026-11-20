@@ -56,7 +56,8 @@ def resolve_settings(cli_dbml: str | None, cli_db: str | None) -> Settings:
         host=os.environ.get("HOST", "127.0.0.1"),
         port=_int_env("PORT", 5000),
         page_size=_int_env("PAGE_SIZE", 25),
-        # Sessions only carry flash messages here, so a per-process key is acceptable.
+        # Sessions only carry flash messages and the CSRF token, so a per-process key is
+        # acceptable: forms left open across a restart are refused and simply resubmitted.
         secret_key=os.environ.get("SECRET_KEY") or secrets.token_hex(32),
         debug=os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes"),
     )

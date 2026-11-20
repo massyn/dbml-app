@@ -1,5 +1,32 @@
 // Row navigation, foreign key pickers, and the stacked CRUD modal.
 (() => {
+  // Light/dark theme. base.html sets it before first paint; here the toggle stores the
+  // viewer's choice, and without one the page follows the system setting as it changes.
+  const THEME_KEY = 'dbml-crud.theme';
+  const storedTheme = () => {
+    try {
+      return localStorage.getItem(THEME_KEY);
+    } catch {
+      return null;
+    }
+  };
+  const setTheme = (theme) => {
+    document.documentElement.dataset.bsTheme = theme;
+  };
+  const systemDark = matchMedia('(prefers-color-scheme: dark)');
+  systemDark.addEventListener('change', (e) => {
+    if (!storedTheme()) setTheme(e.matches ? 'dark' : 'light');
+  });
+  document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
+    const theme = document.documentElement.dataset.bsTheme === 'dark' ? 'light' : 'dark';
+    setTheme(theme);
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch {
+      // not remembered this time; the switch still applies to this page
+    }
+  });
+
   // Sidebar groups: remember which ones the viewer closed (per browser). Storage may be
   // unavailable (private windows, blocked site data), so every access is guarded.
   const NAV_KEY = 'dbml-crud.closed-groups';
@@ -116,6 +143,29 @@
     else modal.hide();
   }
 
+  // Related-records panels on an edit page: each holds an embedded list, loaded here and
+  // reloaded in place when it is searched, sorted or paged, or a record in it is saved.
+  async function loadEmbed(panel, url = panel.dataset.url) {
+    panel.dataset.url = url;
+    try {
+      panel.replaceChildren(await load(url));
+    } catch (err) {
+      console.error('Could not load', url, err);
+      const message = document.createElement('div');
+      message.className = 'empty-state';
+      message.textContent = 'Could not load these records. See the browser console.';
+      panel.replaceChildren(message);
+    }
+  }
+  document.querySelectorAll('[data-embed]').forEach((panel) => loadEmbed(panel));
+
+  document.addEventListener('submit', (e) => {
+    const form = e.target.closest('[data-embed-search]');
+    if (!form) return;
+    e.preventDefault();
+    loadEmbed(form.closest('[data-embed]'), `${form.action}?${new URLSearchParams(new FormData(form))}`);
+  });
+
   // Text areas cannot be measured while the modal is hidden; size them once it is shown.
   modalEl.addEventListener('shown.bs.modal', () => growAll(body));
 
@@ -197,11 +247,15 @@
     const pushLink = target.closest('[data-modal-push]');
     if (pushLink) {
       e.preventDefault();
+      const panel = pushLink.closest('[data-embed]');
       const list = top();
       const selectOnSave = 'selectOnSave' in pushLink.dataset;
-      push(pushLink.href, pushLink.dataset.title, {
+      // Links carry href; embedded rows carry data-url.
+      push(pushLink.href || pushLink.dataset.url, pushLink.dataset.title, {
         onDone: (result) => {
-          if (selectOnSave && result.id !== undefined && list.onSelect) {
+          if (panel) {
+            loadEmbed(panel);
+          } else if (selectOnSave && result.id !== undefined && list.onSelect) {
             pop();
             list.onSelect(String(result.id), result.label);
           } else {
@@ -209,6 +263,13 @@
           }
         },
       });
+      return;
+    }
+
+    const embedLink = target.closest('[data-embed-link]');
+    if (embedLink) {
+      e.preventDefault();
+      loadEmbed(embedLink.closest('[data-embed]'), embedLink.href);
       return;
     }
 

@@ -4,3 +4,6 @@
 *.db-shm
 __pycache__/
 .pytest_cache/
+.venv/
+.cache/
+data/

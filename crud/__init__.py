@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from flask import Flask
+from flask_wtf import CSRFProtect
 
 from config import Settings
 
@@ -14,6 +15,8 @@ from .schema import load_schema
 from .sync import sync_schema
 
 ROOT = Path(__file__).resolve().parent.parent
+
+csrf = CSRFProtect()
 
 
 def get_schema(app: Flask) -> Schema:
@@ -39,6 +42,7 @@ def create_app(settings: Settings) -> Flask:
     from .views import bp
 
     app.register_blueprint(bp)
+    csrf.init_app(app)
     app.teardown_appcontext(db.close_db)
     app.add_template_filter(render_markdown, "markdown")
     app.add_template_filter(label, "label")
